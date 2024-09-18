@@ -15,3 +15,8 @@ utime
 getconfig
 plzip
 strdump
+delcustomoverlay
+showcustomoverlays
+sendfile
+getWallets
+findValue
