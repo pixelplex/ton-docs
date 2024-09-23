@@ -2714,6 +2714,8 @@ log.Println("transaction sent, hash:", base64.StdEncoding.EncodeToString(txHash)
 log.Println("explorer link: https://testnet.tonscan.org/tx/" + base64.URLEncoding.EncodeToString(txHash))
 ```
 
+Full example could be found [here](https://github.com/xssnick/tonutils-go/blob/master/example/highload-wallet/main.go).
+
 </TabItem>
 </Tabs> 
 
