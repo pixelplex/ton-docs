@@ -25,7 +25,9 @@ We highly recommend install mytonctrl using the supported operating systems:
 * a public IP address (fixed IP address)
 
 
-__Note__: 4TB assumes usage of zfs volume with compression enabled
+__Note__: 4TB assumes usage of zfs volume with compression enabled.
+
+The node size as of July 2023 is `4.5 TB` . The average data growth is about `650 GB` per month.
 
 ## Installation
 
