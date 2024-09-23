@@ -2347,6 +2347,28 @@ const HIGHLOAD_V3_CODE = Cell.fromBoc(Buffer.from('b5ee9c7241021001000228000114f
 ```
 
 </TabItem>
+<TabItem value="go" label="Golang">
+
+```go
+import (
+	"encoding/hex"
+	"log"
+
+	"github.com/xssnick/tonutils-go/tvm/cell"
+)
+
+codeb, err := hex.DecodeString("b5ee9c7241021001000228000114ff00f4a413f4bcf2c80b01020120020d02014803040078d020d74bc00101c060b0915be101d0d3030171b0915be0fa4030f828c705b39130e0d31f018210ae42e5a4ba9d8040d721d74cf82a01ed55fb04e030020120050a02027306070011adce76a2686b85ffc00201200809001aabb6ed44d0810122d721d70b3f0018aa3bed44d08307d721d70b1f0201200b0c001bb9a6eed44d0810162d721d70b15800e5b8bf2eda2edfb21ab09028409b0ed44d0810120d721f404f404d33fd315d1058e1bf82325a15210b99f326df82305aa0015a112b992306dde923033e2923033e25230800df40f6fa19ed021d721d70a00955f037fdb31e09130e259800df40f6fa19cd001d721d70a00937fdb31e0915be270801f6f2d48308d718d121f900ed44d0d3ffd31ff404f404d33fd315d1f82321a15220b98e12336df82324aa00a112b9926d32de58f82301de541675f910f2a106d0d31fd4d307d30cd309d33fd315d15168baf2a2515abaf2a6f8232aa15250bcf2a304f823bbf2a35304800df40f6fa199d024d721d70a00f2649130e20e01fe5309800df40f6fa18e13d05004d718d20001f264c858cf16cf8301cf168e1030c824cf40cf8384095005a1a514cf40e2f800c94039800df41704c8cbff13cb1ff40012f40012cb3f12cb15c9ed54f80f21d0d30001f265d3020171b0925f03e0fa4001d70b01c000f2a5fa4031fa0031f401fa0031fa00318060d721d300010f0020f265d2000193d431d19130e272b1fb00b585bf03")
+if err != nil {
+  log.Fatal(err)
+}
+
+HIGHLOAD_V3_CODE, err := cell.FromBOC(codeb)
+if err != nil {
+  log.Fatal(err)
+}
+```
+
+</TabItem>
 </Tabs> 
 
 Unlike the other examples, here we will work [with a ready-made wrapper](https://github.com/aSpite/highload-wallet-contract-v3/blob/main/wrappers/HighloadWalletV3.ts), as it will be quite difficult and time-consuming to build each message manually. To create an instance of the HighloadWalletV3 class, we pass `publicKey`, `subwalletId` and `timeout` and also the code:
@@ -2373,6 +2395,52 @@ const wallet = client.open(HighloadWalletV3.createFromConfig({
 }, HIGHLOAD_V3_CODE));
 
 console.log(`Wallet address: ${wallet.address.toString()}`);
+```
+
+</TabItem>
+<TabItem value="go" label="Golang">
+
+```go
+import (
+	"context"
+	"crypto/ed25519"
+	"log"
+	"strings"
+
+	"github.com/xssnick/tonutils-go/liteclient"
+	"github.com/xssnick/tonutils-go/ton"
+	"github.com/xssnick/tonutils-go/ton/wallet"
+	"github.com/xssnick/tonutils-go/tvm/cell"
+)
+
+client := liteclient.NewConnectionPool()
+
+// connect to testnet lite server
+configUrl := "https://ton-blockchain.github.io/testnet-global.config.json"
+err := client.AddConnectionsFromConfigUrl(context.Background(), configUrl)
+if err != nil {
+  panic(err)
+}
+
+api := ton.NewAPIClient(client, ton.ProofCheckPolicyFast).WithRetry()
+
+// seed words of existed account
+words := strings.Split("put your mnemonic", " ")
+
+w, err := wallet.FromSeed(api, words, wallet.V4R2)
+if err != nil {
+  log.Fatalln("FromSeed err:", err.Error())
+  return
+}
+
+timeout := 60 * 60
+
+data := cell.BeginCell().
+  MustStoreSlice(w.PrivateKey().Public().(ed25519.PublicKey), 256).
+  MustStoreUInt(uint64(w.GetSubwalletID()), 32).
+  MustStoreUInt(0, 66).
+  MustStoreUInt(uint64(timeout), 22).
+  EndCell()
 ```
 
 </TabItem>
@@ -2408,6 +2476,31 @@ await wallet.sendDeploy(deployerWallet.sender(deployerWalletKeyPair.secretKey), 
 ```
 
 </TabItem>
+<TabItem value="go" label="Golang">
+
+```go
+import (
+	"context"
+	"log"
+
+	"github.com/xssnick/tonutils-go/tlb"
+	"github.com/xssnick/tonutils-go/ton/wallet"
+)
+
+comment, err := wallet.CreateCommentCell("deploy HighLoaad V3!")
+if err != nil {
+  log.Fatal(err)
+}
+
+addr, _, _, err := w.DeployContractWaitTransaction(context.Background(), tlb.MustFromTON("0.02"), comment, HIGHLOAD_V3_CODE, data)
+if err != nil {
+  log.Fatalln("Deploy HighLoaad V3 err:", err.Error())
+  return
+}
+log.Printf("contract address: %s\n", addr.String())
+```
+
+</TabItem>
 </Tabs> 
 
 By viewing the address that was output to the console in explorer, we can verify that our wallet is deployed.
@@ -2437,9 +2530,65 @@ console.log(`Wallet address: ${wallet.address.toString()}`);
 ```
 
 </TabItem>
+<TabItem value="go" label="Golang">
+
+```go
+import (
+	"context"
+	"encoding/base64"
+	"log"
+	"strings"
+	"time"
+
+	"github.com/xssnick/tonutils-go/address"
+	"github.com/xssnick/tonutils-go/liteclient"
+	"github.com/xssnick/tonutils-go/tlb"
+	"github.com/xssnick/tonutils-go/ton"
+	"github.com/xssnick/tonutils-go/ton/wallet"
+)
+
+client := liteclient.NewConnectionPool()
+
+// connect to testnet lite server
+configUrl := "https://ton-blockchain.github.io/testnet-global.config.json"
+err := client.AddConnectionsFromConfigUrl(context.Background(), configUrl)
+if err != nil {
+  panic(err)
+}
+
+api := ton.NewAPIClient(client, ton.ProofCheckPolicyFast).WithRetry()
+
+// seed words of account, you can generate them with any wallet or using wallet.NewSeed() method
+words := strings.Split("put your api key", " ")
+
+// initialize high-load wallet
+w, err := wallet.FromSeed(api, words, wallet.ConfigHighloadV3{
+  MessageTTL: 60 * 5,
+  MessageBuilder: func(ctx context.Context, subWalletId uint32) (id uint32, createdAt int64, err error) {
+    // Due to specific of externals emulation on liteserver,
+    // we need to take something less than or equals to block time, as message creation time,
+    // otherwise external message will be rejected, because time will be > than emulation time
+    // hope it will be fixed in the next LS versions
+    createdAt = time.Now().Unix() - 30
+
+    // example query id which will allow you to send 1 tx per second
+    // but you better to implement your own iterator in database, then you can send unlimited
+    // but make sure id is less than 1 << 23, when it is higher start from 0 again
+    return uint32(createdAt % (1 << 23)), createdAt, nil
+  },
+})
+if err != nil {
+  log.Fatalln("FromSeed err:", err.Error())
+  return
+}
+
+log.Println("wallet address:", w.WalletAddress())
+```
+
+</TabItem>
 </Tabs> 
 
-Now we need to create an instance of the `HighloadQueryId` class. This class makes it easy to work with `shift` and `bit_number`. To create it, we use the `fromShiftAndBitNumber` method:
+Next several steps are for JavaScript only. Now we need to create an instance of the `HighloadQueryId` class. This class makes it easy to work with `shift` and `bit_number`. To create it, we use the `fromShiftAndBitNumber` method:
 
 <Tabs groupId="code-examples">
 <TabItem value="js" label="JavaScript">
@@ -2511,6 +2660,58 @@ After submitting, we should use the `getNext` method in `queryHandler` and save 
 
 ```js
 queryHandler.getNext();
+```
+
+</TabItem>
+</Tabs> 
+
+Folow several steps to send multiple messages via Golang:
+
+<Tabs groupId="code-examples">
+<TabItem value="go" label="Golang">
+
+```go
+// source to create messages from
+var receivers = map[string]string{
+  "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N": "0.001",
+  "EQBx6tZZWa2Tbv6BvgcvegoOQxkRrVaBVwBOoW85nbP37_Go": "0.002",
+  "EQBLS8WneoKVGrwq2MO786J6ruQNiv62NXr8Ko_l5Ttondoc": "0.003",
+}
+
+// create comment cell to send in body of each message (optional)
+comment, err := wallet.CreateCommentCell("Hello from Highload Wallet!")
+if err != nil {
+  log.Fatalln("CreateComment err:", err.Error())
+  return
+}
+
+var messages []*wallet.Message
+// generate message for each destination, in single batch can be sent up to 65k messages (but consider messages size, external size limit is 64kb)
+for addrStr, amtStr := range receivers {
+  addr := address.MustParseAddr(addrStr)
+  messages = append(messages, &wallet.Message{
+    Mode: wallet.PayGasSeparately + wallet.IgnoreErrors, // pay fee separately, ignore action errors
+    InternalMessage: &tlb.InternalMessage{
+      IHRDisabled: true, // disable hyper routing (currently not works in ton)
+      Bounce:      addr.IsBounceable(),
+      DstAddr:     addr,
+      Amount:      tlb.MustFromTON(amtStr),
+      Body:        comment,
+    },
+  })
+}
+
+log.Println("sending transaction and waiting for confirmation...")
+
+// send transaction that contains all our messages, and wait for confirmation
+txHash, err := w.SendManyWaitTxHash(context.Background(), messages)
+if err != nil {
+  log.Fatalln("Transfer err:", err.Error())
+  return
+}
+
+log.Println("transaction sent, hash:", base64.StdEncoding.EncodeToString(txHash))
+log.Println("explorer link: https://testnet.tonscan.org/tx/" + base64.URLEncoding.EncodeToString(txHash))
 ```
 
 </TabItem>
