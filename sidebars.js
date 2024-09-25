@@ -254,9 +254,19 @@ const sidebars = {
           type: 'category',
           label: 'Tutorials & Examples',
           items: [
+            {
+              type: 'category',
+              label: 'Wallet Smart Contracts',
+              items: [
+                'develop/smart-contracts/wallets/overview',
+                'develop/smart-contracts/wallets/structure',
+                'develop/smart-contracts/wallets/messages',
+                'develop/smart-contracts/wallets/deploying',
+                'develop/smart-contracts/wallets/highload',
+              ],
+            },
             'develop/smart-contracts/tutorials/multisig',
             'develop/smart-contracts/tutorials/multisig-js',
-            'develop/smart-contracts/tutorials/wallet',
             'develop/smart-contracts/examples',
           ],
         },
