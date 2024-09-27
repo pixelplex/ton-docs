@@ -58,16 +58,17 @@ If you don't have mytonctrl, install it with `-m liteserver` flag:
 * `-i` - Ignore minimum requirements, use it only if you want to check compilation process without real node usage.
 * `-m` - Mode, can be `validator` or `liteserver`.
 
-**To use testnet**, `-c` flag should be provided with `https://ton.org/testnet-global.config.json` value.
-
-Default `-c` flag value is `https://ton-blockchain.github.io/global.config.json`, which is default mainnet config.
-
 If you already have mytonctrl installed, run:
 
 ```bash
 user@system:~# mytonctrl
 MyTonCtrl> enable_mode liteserver
 ```
+
+### Testnet 
+Flag `-c` should be provided with `https://ton.org/testnet-global.config.json` value while [installing](/participate/run-nodes/enable-liteserver-node#installation-of-liteserver).
+
+Default `-c` flag value is `https://ton-blockchain.github.io/global.config.json`, which is default mainnet config.
 
 ## Check the firewall settings
 
