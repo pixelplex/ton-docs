@@ -24,6 +24,9 @@ It can be done with your network provider or [rent a server](/participate/run-no
 It's possible to find out which UDP port is opened from the `netstat -tulpn` command.
 :::
 
+## Participation Costs
+
+Validator spends ~100 TON monthly for masterchain fees and ~113 TON during validating both rounds (even and odd validation cycles) as [single nominator](/participate/network-maintenance/single-nominator).
 
 ## Prerequisite
 
