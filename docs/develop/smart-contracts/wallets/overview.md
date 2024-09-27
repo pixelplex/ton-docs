@@ -147,7 +147,7 @@ It is also possible to use another IDE since GoLand isn’t free, but it is pref
 :::
 
 :::warning IMPORTANT
-All coding components should be added to the `main` function that was created in the [⚙ Set Your Environment](/develop/smart-contracts/tutorials/wallet#-set-your-environment) section.
+All coding components should be added to the `main` function that was created in the [⚙ Set Your Environment](/develop/smart-contracts/wallets/overview#-set-your-environment) section.
 
 Additionally, only the imports required for a specific code section will be specified in each new section and new imports will need to be added and combined with old ones.  
 :::

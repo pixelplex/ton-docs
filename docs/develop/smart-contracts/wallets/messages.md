@@ -591,7 +591,7 @@ for i := 0; i < len(internalMessagesAmount); i++ {
 </TabItem>
 </Tabs>
 
-Now let's use our knowledge from [chapter two](/develop/smart-contracts/tutorials/wallet#-deploying-our-wallet) to build a message for our wallet that can send 4 messages simultaneously:
+Now let's use our knowledge from [chapter two](/develop/smart-contracts/wallets/deploying#-deploying-a-wallet) to build a message for our wallet that can send 4 messages simultaneously:
 
 <Tabs groupId="code-examples">
 <TabItem value="js" label="JavaScript">
@@ -880,7 +880,7 @@ internalMessage := cell.BeginCell().
 </Tabs>
 
 The NFT transfer opcode comes from [the same standard](https://github.com/ton-blockchain/TEPs/blob/master/text/0062-nft-standard.md#tl-b-schema).
-Now let's complete the message, as is laid out in the previous sections of this tutorial. The correct code needed to complete the message is found in the [GitHub repository](/develop/smart-contracts/tutorials/wallet#source-code).
+Now let's complete the message, as is laid out in the previous sections of this tutorial. The correct code needed to complete the message is found in the [GitHub repository](/develop/smart-contracts/wallets/overview#source-code).
 
 The same procedure can be completed with Jettons. To conduct this process, read the TL-B [standart](https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md) for jettons transfer. To this point specifically, a small difference between NFT and Jettons transfers exists.
 
@@ -1058,7 +1058,7 @@ The response must be `-1`, meaning the result is true. It is also possible to se
 
 In chapter three, we deployed a wallet. To accomplish this, we initially sent some TON and then a message from the wallet to deploy a smart contract. However, this process is not broadly used with external messages and is often primarily used for wallets only. While developing contracts, the deployment process is initialized by sending internal messages.
 
-To accomplish this, will use the V3R2 wallet smart contract that was used in [the third chapter](/develop/smart-contracts/tutorials/wallet#compiling-our-wallet-code).
+To accomplish this, will use the V3R2 wallet smart contract that was used in [the third chapter](/develop/smart-contracts/wallets/messages#compiling-our-wallet-code).
 In this case, we’ll set the `subwallet_id` to `3` or any other number needed to retrieve another address when using the same private key (it's changeable):
 
 <Tabs groupId="code-examples">

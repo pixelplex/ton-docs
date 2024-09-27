@@ -2258,7 +2258,7 @@ int processed?(int query_id) method_id {
 
 为了部署高负载钱包，必须提前生成一个助记词密钥，用户将使用此密钥。可以使用在本教程之前部分中使用的相同密钥。
 
-要开始部署高负载钱包的过程，必须将[智能合约的代码](https://github.com/ton-blockchain/ton/blob/master/crypto/smartcont/highload-wallet-v2-code.fc)复制到 stdlib.fc 和 wallet_v3 所在的同一目录中，并记得在代码开头添加`#include "stdlib.fc";`。接下来，我们将像在[第三节](/develop/smart-contracts/tutorials/wallet#compiling-wallet-code)中所做的那样，编译高负载钱包代码：
+要开始部署高负载钱包的过程，必须将[智能合约的代码](https://github.com/ton-blockchain/ton/blob/master/crypto/smartcont/highload-wallet-v2-code.fc)复制到 stdlib.fc 和 wallet_v3 所在的同一目录中，并记得在代码开头添加`#include "stdlib.fc";`。接下来，我们将像在[第三节](/develop/smart-contracts/wallets/deploying#compiling-wallet-code)中所做的那样，编译高负载钱包代码：
 
 <Tabs groupId="code-examples">
 <TabItem value="js" label="JavaScript">
