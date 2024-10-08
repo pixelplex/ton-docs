@@ -14,7 +14,7 @@
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
   learn: require('./sidebars/learn'),
-  develop: require('./sidebars/develop'),
+  documentation: require('./sidebars/develop'),
   guidelines: require('./sidebars/guidelines'),
   participate: require('./sidebars/participate'),
   contribute: require('./sidebars/contribute'),

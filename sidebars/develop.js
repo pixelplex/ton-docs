@@ -247,7 +247,7 @@ module.exports = [
     label: 'Network Configurations',
     items: [
       'develop/howto/network-configs',
-      'develop/howto/blockchain-configs',
+      'bc',
       'develop/howto/config-params',
     ],
   },
