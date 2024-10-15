@@ -103,7 +103,7 @@ Let's have a look at them.
 
 ### Highload Wallets
 
-When working with many messages in a short period, there is a need for special wallet called Highload Wallet. Read [the article](/participate/wallets/highload-contracts) for more information.
+When working with many messages in a short period, there is a need for special wallet called Highload Wallet. Read [the article](/participate/wallets/highload) for more information.
 
 ### Lockup wallet
 

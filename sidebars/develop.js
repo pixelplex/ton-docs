@@ -50,7 +50,7 @@ module.exports = [
     label: 'Contracts Specification',
     items: [
       'participate/wallets/contracts',
-      'participate/wallets/highload-contracts',
+      'participate/wallets/highload',
       'participate/network-maintenance/vesting-contract',
       'develop/smart-contracts/governance',
       'participate/network-maintenance/nominator-pool',
