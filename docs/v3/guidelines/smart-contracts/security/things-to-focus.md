@@ -1,5 +1,7 @@
 # Things to Focus on while Working with TON Blockchain
 
+Chnage smth!
+
 In this article, we will review and discuss the elements to consider for those who want to develop TON applications.
 
 ## Checklist
