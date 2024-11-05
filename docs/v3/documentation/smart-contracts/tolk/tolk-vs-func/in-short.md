@@ -3,6 +3,8 @@
 Tolk is much more similar to TypeScript and Kotlin than to C and Lisp. 
 But it still gives you full control over TVM assembler, since it has a FunC kernel inside.
 
+Change smth!
+
 1. Functions are declared via `fun`, get methods via `get`, variables via `var` (and `val` for immutable), putting types on the right; parameter types are mandatory; return type can be omitted (auto inferred), as well as for locals; specifiers `inline` and others are `@` attributes
 ```tolk
 global storedV: int;
