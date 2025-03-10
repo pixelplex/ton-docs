@@ -1,0 +1,504 @@
+# Processing Messages
+
+> **Summary:** In previous steps we modified our smart-contract interaction with `storage, `get methods` and learned basic smart-contract development flow.
+
+Now that we have learned basic examples of modifying smart-contract code and using development tools, we are ready to move on to the main functionality of smart contracts - sending and receiving messages. 
+
+First thing to mention is that in TON, messages are not just currency exchange actions carrying TON coins. They are also a **data exchange mechanism** that provides an opportunity to create your own "network" of smart contracts interacting with each other and smart contracts of other network participants that are not under your direct control.
+
+:::tip
+If you are stuck on some of the examples you can find original template project with all modifications performed during this guide [here](https://github.com/ton-community/ton-onboarding-sandbox/tree/main/quick-start/smart-contracts/Example).
+:::
+
+---
+
+## External Messages
+
+`External messages` are your main way of toggling smart contract logic from outside the blockchain. Usually, there is no need for implementation of them in smart contracts because in most cases you don't want external entry points to be accessible to anyone except you. This includes several standard approaches of verifying external message sender providing safe entry point to the TON network which we will discuss here. If this is all functionality that you want from external section - standard way is to delegate this responsibility to separate actor - `wallet` which is practically the main reason they were designed for.
+
+### Wallets
+
+When we sent coins using wallet app in [getting started](/v3/guidelines/quick-start/getting-started#step-3-exploring-the-blockchain) section what `wallet app` actually performs is sending `external message` to your `wallet` smart contract which performs sending message to destination smart-contract address that you wrote in send menu. While most wallet apps during creation of wallet deploy most modern versions of wallet smart contracts - `v5`, providing more complex functionality, let's examine `recv_external` section of more basic one - `v3`:
+
+```func
+() recv_external(slice in_msg) impure {
+    var signature = in_msg~load_bits(512);
+    var cs = in_msg;
+    var (subwallet_id, msg_seqno) = (cs~load_uint(32), cs~load_uint(32));
+    var ds = get_data().begin_parse();
+    var (stored_seqno, stored_subwallet, public_key) = (ds~load_uint(32), ds~load_uint(32), ds~load_uint(256));
+    ds.end_parse();
+    throw_unless(33, msg_seqno == stored_seqno);
+    throw_unless(34, subwallet_id == stored_subwallet);
+    throw_unless(35, check_signature(slice_hash(in_msg), signature, public_key));
+    accept_message();
+    cs~touch();
+    while (cs.slice_refs()) {
+        var mode = cs~load_uint(8);
+        send_raw_message(cs~load_ref(), mode);
+    }
+    set_data(begin_cell()
+        .store_uint(stored_seqno + 1, 32)
+        .store_uint(stored_subwallet, 32)
+        .store_uint(public_key, 256)
+    .end_cell());
+    }
+```
+
+First thing to mention - is `signature` in message body and stored `public_key`. This refers to standard mechanism of asymmetric cryptography: during deployment process you create **private and public key pair**, store the second one in initial contract storage and then during sending external message through client **sign** it with **private key** attaching calculated `signature` to message body. Smart contract on its side checks if signature matches `public_key` and accepts external message if it is so.
+
+Standard signature system for TON smart-contracts is `Ed25519` which is directly provided by `TVM` instruction `check_signature()`, but you can always implement another preferred algorithm by yourself.
+
+:::tip
+When you entered **magic 24 secret words** (i.e. **mnemonic phrase**) during [wallet creation](/v3/documentation/data-formats/tlb/tl-b-language) in your app what is practically performed is concatenation of those words into one string and hashing it to create your **private key**. So remember not to show them to anyone.
+:::
+
+Second thing is `seqno` (sequential number) as you can see this is practically just a counter that increments each time wallet smart-contract receives external message, but why do we need one?
+The reason behind that lies in blockchain nature: since all transactions are visible to anyone, potential malefactor could repeatedly send already signed transaction to your smart contract. 
+
+> **Simpliest scenario:** you transfer some amount of funds to receiver, receiver examines transaction and sends it to your contract repeatedly until you run out of funds and receiver gains almost all of them.
+
+Third thing is `subwallet_id` that just checks equality to the stored one, we will discuss its meaning a little bit later in internal messages section.
+
+### Implementation
+
+At this point reasons behind changes that we made to our counter in previous storage and get methods [section](/v3/guidelines/quick-start/developing-smart-contracts/storage-and-get-methods#smart-contract-storage-operations) should start to be more clear! We already prepared our storage to contain `seqno`, `public_key` and `ctx_id` which will serve same task as `subwallet_id` so let's adapt wallet's `recv_external` function to our project:
+
+```func
+() recv_external(slice in_msg) impure {
+    ;; retrives validating data from message body
+    var signature = in_msg~load_bits(512);
+    var cs = in_msg;
+    var (ctx_id, msg_seqno) = (cs~load_uint(32), cs~load_uint(32));
+
+    ;; retrieves stored data for validation checks
+    var (stored_id, stored_seqno, public_key) = load_data();
+    ;; replay protection mechanism through seqno chack and incrementing
+    throw_unless(33, msg_seqno == stored_seqno);
+    ;; id field for multiply addresess with same private_key 
+    throw_unless(34, ctx_id == stored_id);
+    ;; ed25519 signature check
+    throw_unless(35, check_signature(slice_hash(in_msg), signature, public_key));
+    ;; accepting message after all checks
+    accept_message();
+    ;; optimization technique
+    ;; putting message body to stack head
+    cs~touch();
+    ;; sending serialized on client side messages 
+    while (cs.slice_refs()) {
+        var mode = cs~load_uint(8);
+        send_raw_message(cs~load_ref(), mode);
+    }
+    save_data(stored_id, stored_seqno + 1, public_key);
+}```
+
+And add wrapper method to call it through our wrapper class:
+
+```typescript
+async sendExternal(
+    provider: ContractProvider,
+    opts: {
+        mode: number
+        message: Cell,
+        secret_key: Buffer
+    }
+) {
+    const seqno = await this.getCounter(provider)
+    const id = await this.getID(provider) 
+
+    const toSign = beginCell()
+        .storeUint(id, 32)
+        .storeUint(seqno, 32)
+        .storeUint(opts.mode, 8)
+        .storeRef(opts.message)
+
+    const signature = sign(toSign.endCell().hash(), opts.secret_key)
+
+    return await provider.external(beginCell()
+        .storeBuffer(signature)
+        .storeBuilder(toSign)
+    .endCell()
+    );
+}
+```
+
+Here we are preparing all required values for contract checks and add payload message that will be sent as internal message further to final receiver smart-contract.
+
+As you can see here we are using `provider.external()` method instead of `provider.internal()` one which requires a via argument, that now we can start to understand. The thing is that `provider.internal()` method is doing practically the same thing that we are trying to implement: since we can't directly call internal methods to test them we need to wrap them into external message and send it through some wallet.
+
+Now let's test our implementation:
+
+```typescript
+it('should send an external message containing an internal message', async () => {
+    const receiver = await blockchain.treasury('receiver');
+    
+    const internalMessage = beginCell()
+        .storeUint(0, 32) // Simple message with no specific opcode
+        .storeUint(42, 64) // queryID = 42
+        .storeStringTail('Hello from external message!')
+        .endCell();
+    
+    const messageToSend = beginCell().store(storeMessageRelaxed(internal({
+        to: receiver.address,
+        value: toNano(0.01),
+        body: internalMessage,
+        bounce: true,
+    }))).endCell();
+
+    const receiverBalanceBefore = await receiver.getBalance();
+
+    const result = await helloWorld.sendExternal({
+        mode: SendMode.PAY_GAS_SEPARATELY,
+        message: messageToSend,
+        secret_key: keyPair.secretKey
+    });
+
+    expect(result.transactions).toHaveTransaction({
+        from: undefined, // External messages have no 'from' address
+        to: helloWorld.address,
+        success: true,
+    });
+
+    expect(result.transactions).toHaveTransaction({
+        from: helloWorld.address,
+        to: receiver.address,
+        success: true,
+    });
+
+    const receiverBalanceAfter = await receiver.getBalance();
+
+    expect(receiverBalanceAfter).toBeGreaterThan(receiverBalanceBefore);
+    const [seqnoAfter] = await helloWorld.getSeqnoPKey();
+    expect(seqnoAfter).toBe(1); // Since it should start from 0 and increment to 1
+});
+```
+
+---
+
+## Internal messages
+
+We are almost at the finish line! Let's cook a simple `internal message` to other contract and implement its processing on receiver side! We have already seen a counter that increases its values through `external messages`, now let's make it through internal one. And to make this task a little more interesting let's ensure that only one `actor` has access to this functionality.
+
+### Actors and roles
+
+Since TON implements actor [model](/v3/concepts/dive-into-ton/ton-blockchain/blockchain-of-blockchains/#single-actor) it's natural to think about smart-contracts relations in terms of `roles`, determining who can access smart-contract functionality or not. The most common examples of roles are:
+
+ - `anyone`: any contract that don't have distinct role.
+ - `owner`: contract that has exclusive access to some crucial parts of functionality.
+
+If you look at `recv_internal()` function signature in your smart contract you can see `in_msg_full` and `in_msg_body` arguments, while the second one carries actual payload of sender which is free to fill it anyway they want, first one consists of several values describing transaction context. You can consider `in_msg_full` as some type of message **header**. We will not dwell in detail for each of values during this guide, what is important for us now, is that this part of message is defined by TON implementation and **always validated on sender side** and as a result cannot be fabricated.
+
+What we specifically are interested in is the source address of message, by obtaining that address and comparing to stored one, that we previously saved, for example, during deployment, we can open crucial part of our smart contract functionality. Common approach looks like this:
+
+```func
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Parse the sender address from in_msg_full
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    
+    ;; Check if message was sent by the owner
+    if (equal_slices(sender_address, owner_address)) {
+      ;;owner operations
+      return
+    } else if (equal_slices(sender_address, other_role_address)){
+      ;;other role operations
+      return
+    } else {
+      ;;anyone else operations
+      return
+    }
+
+    ;;no known operation were obtained for presented role
+    ;;0xffff is not standard exit code, but is standard practice among TON developers
+    throw(0xffff);
+}
+```
+
+### Operations
+
+Another common pattern in TON contracts is to include a **32-bit operation code** in message bodies which tells your contract what action to perform:
+
+```func
+const int op::increment = 1;
+const int op::decrement = 2;
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; Step 1: Check if the message is empty
+    if (in_msg_body.slice_empty?()) { 
+        return; ;; Nothing to do with empty messages
+    }
+    
+    ;; Step 2: Extract the operation code
+    int op = in_msg_body~load_uint(32);
+    
+    ;; Step 3-7: Handle the requested operation
+    if (op == op::increment) {
+        increment();   ;;call to specific operation handler
+        return;
+    } else if (op == op::decrement) {
+        decrement();
+        ;; Just accept the money
+        return;
+    }
+
+    ;; Unknown operation
+    throw(0xffff);
+}
+```
+
+By combining both of these patterns you can achieve a comprehensive description of your smart-contract's systems ensuring secure interaction between them and unleash full potential of TON actors model.
+
+### Implementation
+
+First, let's create a second counter that we will be communicating with by running following command:
+
+```bash
+npx blueprint create
+```
+
+Choose counter pattern and appreciated name in interactive menu, we will use `CounterInternal`. 
+
+:::tip
+By the way, this is a good opportunity to try out one of the smart-contract development languages that you didn't use previously during this guide.
+:::
+
+Now let's update our smart-contract to contain owner address:
+
+```func
+global int ctx_id;
+global int ctx_counter;
+global slice owner_address;
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_id = ds~load_uint(32);
+    ctx_counter = ds~load_uint(32);
+    owner_address = ds~load_msg_addr();
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_uint(ctx_counter, 32)
+            .store_slice(owner_address)
+        .end_cell()
+    );
+}
+```
+
+Update `recv_internal` to ignore any non-empty messages not sent by owner, and corresponding get method:
+
+```func
+ () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    load_data(); ;; here we populate the storage variables
+    slice sender_addr = cs~load_msg_addr();
+    if (equal_slices_bits(sender_addr, owner_address) != -1) {
+        throw(42);
+    }
+
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention
+
+    if (op == op::increase) {
+        int increase_by = in_msg_body~load_uint(32);
+        ctx_counter += increase_by;
+        save_data();
+        return ();
+    }
+
+    throw(0xffff); ;; if the message contains an op that is not known to this contract, we throw
+}
+
+slice get_owner() method_id {
+    load_data();
+    return owner_address;
+}
+```
+
+Don't forget to update wrapper class, add new get method and update deployment part to initialize storage with owner address:
+
+```func
+export type CounterInternalConfig = {
+    id: number;
+    counter: number;
+    owner: Address;
+};
+
+export function counterInternalConfigToCell(config: CounterInternalConfig): Cell {
+    return beginCell()
+        .storeUint(config.id, 32)
+        .storeUint(config.counter, 32)
+        .storeAddress(config.owner)
+        .endCell();
+}
+
+//inside CounterInternal class
+async getOwnerAddress(provider: ContractProvider) {
+    const result = await provider.get('get_owner', []);
+    return result.stack.readAddress();
+}
+```
+
+Finally we are ready to create our **multi-contract system**: let's add a test that deploys `HelloWorld` smart contract, then deploys `CounterInternal` contract initialized with `HelloWorld` contract address, then sends *external message* containing internal one to our counter with increment operation. To see that only `HelloWorld` is able to modify counter, let's also try to send a message from another contract and ensure that it is not able to perform it:
+
+```typescript
+describe('Integration with HelloWorld', () => {
+    let codeHelloWorld: Cell;
+    let codeCounterInternal: Cell;
+    let blockchain: Blockchain;
+    let helloWorld: SandboxContract<HelloWorld>;
+    let counterInternal: SandboxContract<CounterInternal>;
+    let keyPair: KeyPair;
+    
+    beforeAll(async () => {
+        codeHelloWorld = await compile('HelloWorld');
+        codeCounterInternal = await compile('CounterInternal');
+    });
+    
+    beforeEach(async () => {
+        blockchain = await Blockchain.create();
+        
+        // Generate a key pair for HelloWorld
+        const seed = await getSecureRandomBytes(32);
+        keyPair = keyPairFromSeed(seed);
+        
+        // Deploy HelloWorld contract
+        helloWorld = blockchain.openContract(
+            HelloWorld.createFromConfig(
+                {
+                    id: 0,
+                    seqno: 0,
+                    public_key: keyPair.publicKey
+                },
+                codeHelloWorld
+            )
+        );
+        
+        const deployerHello = await blockchain.treasury('deployerHello');
+        const deployResultHello = await helloWorld.sendDeploy(deployerHello.getSender(), toNano('1.00'));
+        
+        expect(deployResultHello.transactions).toHaveTransaction({
+            from: deployerHello.address,
+            to: helloWorld.address,
+            deploy: true,
+            success: true,
+        });
+        
+        // Deploy CounterInternal with HelloWorld as the owner
+        counterInternal = blockchain.openContract(
+            CounterInternal.createFromConfig(
+                {
+                    id: 0,
+                    counter: 0,
+                    owner: helloWorld.address, // Set HelloWorld as the owner
+                },
+                codeCounterInternal
+            )
+        );
+        
+        const deployerCounter = await blockchain.treasury('deployerCounter');
+        const deployResultCounter = await counterInternal.sendDeploy(deployerCounter.getSender(), toNano('1.00'));
+        
+        expect(deployResultCounter.transactions).toHaveTransaction({
+            from: deployerCounter.address,
+            to: counterInternal.address,
+            deploy: true,
+            success: true,
+        });
+    });
+    
+    it('should only allow owner to increment counter', async () => {
+        // Verify owner is correctly set to HelloWorld
+        const ownerAddress = await counterInternal.getOwnerAddress();
+        expect(ownerAddress.equals(helloWorld.address)).toBe(true);
+        
+        // Get initial counter value
+        const counterBefore = await counterInternal.getCounter();
+        
+        // Try to increase counter from a non-owner account (should fail)
+        const nonOwner = await blockchain.treasury('nonOwner');
+        const increaseBy = 5;
+        
+        const nonOwnerResult = await counterInternal.sendIncrease(nonOwner.getSender(), {
+            increaseBy,
+            value: toNano('0.05'),
+        });
+        
+        // This should fail since only the owner should be able to increment
+        expect(nonOwnerResult.transactions).toHaveTransaction({
+            from: nonOwner.address,
+            to: counterInternal.address,
+            success: false,
+            exitCode: 42, // The error code thrown in the contract
+        });
+        
+        // Counter should remain unchanged
+        const counterAfterNonOwner = await counterInternal.getCounter();
+        expect(counterAfterNonOwner).toBe(counterBefore);
+        
+        // Create internal message to increase counter that will be sent from HelloWorld
+        const internalMessageBody = beginCell()
+            .storeUint(0x7e8764ef, 32) // op::increase opcode
+            .storeUint(0, 64) // queryID = 0
+            .storeUint(increaseBy, 32) // increaseBy
+            .endCell();
+            
+        const messageToSend = beginCell().store(storeMessageRelaxed(internal({
+            to: counterInternal.address,
+            value: toNano(0.01),
+            body: internalMessageBody,
+            bounce: true,
+        }))).endCell();
+        
+        // Send external message to HelloWorld that contains internal message to CounterInternal
+        const result = await helloWorld.sendExternal({
+            mode: SendMode.PAY_GAS_SEPARATELY,
+            message: messageToSend,
+            secret_key: keyPair.secretKey
+        });
+        
+        // Verify the external message was processed successfully
+        expect(result.transactions).toHaveTransaction({
+            from: undefined, // External messages have no 'from' address
+            to: helloWorld.address,
+            success: true,
+        });
+        
+        // Verify the internal message was sent from HelloWorld to CounterInternal
+        expect(result.transactions).toHaveTransaction({
+            from: helloWorld.address,
+            to: counterInternal.address,
+            success: true,
+        });
+        
+        // Verify the counter was increased
+        const counterAfter = await counterInternal.getCounter();
+        expect(counterAfter).toBe(counterBefore + increaseBy);
+    });
+});
+```
+
+Congratulations! We created our first **multi-contract** system and learned how to deal with basic `internal messages`! This example practically describes the general flow of any message chain: send `external message` -> toggle `internal messages` flow according to your system model and so on. Now, when our contracts are fully tested, we are ready to deploy our contracts and interact with them on-chain.
+
+:::danger
+Before considering your smart-contracts production ready and deploying them to `mainnet` take a look at [Security Measures](/v3/guidelines/smart-contracts/security/overview) describing best practice of securing your smart-contract logic.
+:::
+
